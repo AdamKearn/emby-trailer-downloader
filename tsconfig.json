@@ -1,0 +1,50 @@
+// {
+//   "extends": ["@tsconfig/strictest", "@tsconfig/node20/tsconfig.json", "@tsconfig/esm/tsconfig.json"],
+//   "exclude": ["node_modules", "dist", "prettier.config.cjs",],
+//   "compilerOptions": {
+//     "lib": ["DOM"],
+//     "rootDir": "src",
+//     "outDir": "dist",
+//   },
+//   "ts-node": {
+//     "esm": true
+//   }
+// }
+{
+  "compilerOptions": {
+      "strict": true,
+      "allowUnusedLabels": false,
+      "allowUnreachableCode": false,
+      "exactOptionalPropertyTypes": true,
+      "noFallthroughCasesInSwitch": true,
+      "noImplicitOverride": true,
+      "noImplicitReturns": true,
+      "noPropertyAccessFromIndexSignature": true,
+      "noUncheckedIndexedAccess": true,
+      "noUnusedLocals": true,
+      "noUnusedParameters": true,
+      "checkJs": true,
+      "esModuleInterop": true,
+      "skipLibCheck": true,
+      "forceConsistentCasingInFileNames": true,
+      "lib": [
+          "es5", "es6", "dom", "dom.iterable"
+      ],
+      "module": "es2022",
+      "target": "es2022",
+      "moduleResolution": "nodenext",
+      "verbatimModuleSyntax": true,
+      "rootDir": "./src",
+      "outDir": "./dist"
+  },
+  "files": [
+      "./src/env.ts",
+      "./src/index.ts",
+      "./src/types.d.ts"
+  ],
+  "exclude": [
+      "node_modules",
+      "dist",
+      "prettier.config.cjs"
+  ]
+}
