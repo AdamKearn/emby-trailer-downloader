@@ -26,7 +26,7 @@ for (const item of data.Items) {
   for (const url of trailerUrls) {
     try {
       const download = youtubeDl(url, {
-        format: 'best',
+        format: 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
         output: trailerPath,
         noCheckCertificates: true,
         noWarnings: true,
