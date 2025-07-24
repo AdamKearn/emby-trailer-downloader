@@ -31,24 +31,15 @@ for (const item of data.Items) {
         noCheckCertificates: true,
         noWarnings: true,
         addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
+        ...(env.PROXY_STRING ? { proxy: env.PROXY_STRING } : {}),
+        ...(env.COOKIES_FILE ? { cookies: env.COOKIES_FILE } : {}),
       });
 
-      await logger(download, `Downloading Trailer: ${item.Name} (${item.ProductionYear})`);
+      await logger(download, `Downloading Trailer: [${item.Type === 'Movie' ? 'Movie' : 'TV'}] ${item.Name} (${item.ProductionYear})`);
       downloaded = true;
       break; // Exit loop after first successful download
     } catch (error: any) {
-      const isKnownError =
-        error.message?.includes('unable to download video data') ||
-        error.message?.includes('Private video') ||
-        error.message?.includes('not made this video available in your country') ||
-        error.message?.includes('Video unavailable') ||
-        error.message?.includes('HTTP Error 403');
-
-      if (isKnownError) {
-        console.log(`Failed to download trailer from URL for ${item.Name} (${item.ProductionYear}): ${url}`);
-      } else {
-        console.error(`Unexpected error downloading trailer for ${item.Name} (${item.ProductionYear}):`, error);
-      }
+        console.error(`Error During Download: [${item.Type === 'Movie' ? 'Movie' : 'TV'}] ${item.Name} (${item.ProductionYear}):`, error.message.substring(0, error.message.indexOf('.')));
     }
   }
 

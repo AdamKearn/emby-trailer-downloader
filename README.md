@@ -16,6 +16,8 @@ Within the `.env` file it should look something like this.
 ```env
 API_KEY_EMBY=XXXXXXXXXXXXXXXXX
 EMBY_HOSTNAME=http://server:8096
+PROXY_STRING=socks5://<username>:<password>@<location.server.com>:1080
+COOKIES_FILE=/path/to/cookies.txt
 ```
 
 ## Dependencies

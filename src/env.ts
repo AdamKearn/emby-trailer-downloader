@@ -10,6 +10,8 @@ export const env = createEnv({
   server: {
     API_KEY_EMBY: z.string(),
     EMBY_HOSTNAME: z.string(),
+    PROXY_STRING: z.string().optional(),
+    COOKIES_FILE: z.string().optional(),
   },
   runtimeEnv: process.env,
 });
