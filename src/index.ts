@@ -19,7 +19,7 @@ for (const item of data.Items) {
 
   const trailerPath = `${item.Type === 'Movie'
     ? item.Path.substring(0, item.Path.lastIndexOf('/'))
-    : item.Path}/trailers/Trailer - ${item.Name} (${item.ProductionYear}).mkv`;
+    : item.Path}/trailers/Trailer - ${item.Name} (${item.ProductionYear})`;
 
   let downloaded = false;
 
