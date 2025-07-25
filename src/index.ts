@@ -27,7 +27,7 @@ for (const item of data.Items) {
     try {
       const download = youtubeDl(url, {
         format: 'bestvideo[height<=1080]+bestaudio/best[height<=1080]',
-        output: trailerPath,
+        output: trailerPath.replace(/:/g, ""),
         noCheckCertificates: true,
         noWarnings: true,
         addHeader: ['referer:youtube.com', 'user-agent:googlebot'],
