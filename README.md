@@ -54,9 +54,9 @@ Once you are happy how everything is running you can now setup a cronjob to run 
 
 The following cronjob will be run every day at 5am and downloads the latest version of yt-dlp from the [nightly build branch](https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest).
 
-You can change this to fit your usage. Use this website for getting the formatting correctly: https://crontab.guru/
+You may need to modify the `update-and-start` script within `package.json` to use the correct architecture of your host.
 
-Make sure to change the path listed below to the correct location where you downloaded the repo.
+Make sure to change the path listed below to the correct location where you have downloaded the repo.
 ```
 crontab -e
 
