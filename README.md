@@ -52,11 +52,13 @@ Please note all movies will need to be within a folder and not on their own. e.g
 ## Automating Downloading.
 Once you are happy how everything is running you can now setup a cronjob to run the script automatically.
 
-The following cronjob will be run every day at 5am.  You can change this to fit your usage. Use this website for getting the formatting correctly: https://crontab.guru/
+The following cronjob will be run every day at 5am and downloads the latest version of yt-dlp from the [nightly build branch](https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest).
+
+You can change this to fit your usage. Use this website for getting the formatting correctly: https://crontab.guru/
 
 Make sure to change the path listed below to the correct location where you downloaded the repo.
 ```
 crontab -e
 
-0 5 * * * yarn --cwd /path/to/emby-trailer-downloader/ start
+0 5 * * * yarn --cwd /path/to/emby-trailer-downloader/ update-and-start
 ```

@@ -15,7 +15,9 @@
     "dev": "ts-node --esm src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts",
+    "update-yt-dlp": "curl -L https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux_aarch64 -o ./node_modules/youtube-dl-exec/bin/yt-dlp && chmod +x ./node_modules/youtube-dl-exec/bin/yt-dlp",
+    "update-and-start": "yarn run update-yt-dlp && yarn run build && yarn run start"
   },
   "devDependencies": {
     "@tsconfig/esm": "^1.0.3",
