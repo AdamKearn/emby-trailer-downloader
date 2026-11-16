@@ -1,0 +1,98 @@
+<div data-role="page" class="page type-interior pluginConfigurationPage trailerDownloaderConfigPage"
+     data-require="emby-input,emby-button,emby-select,emby-checkbox"
+     data-controller="__plugin/trailerdownloaderjs">
+    <div data-role="content">
+        <div class="content-primary">
+            <form class="trailerDownloaderConfigForm">
+
+                <h2 class="sectionTitle">Trailer Downloader</h2>
+                <p class="fieldDescription">
+                    Downloads trailers for new movies and TV series and stores them in a <code>trailers</code> folder next to the media.
+                    Run <b>Scheduled Tasks &rarr; Trailer Downloader &rarr; Download missing trailers</b> once to back-fill your existing library.
+                </p>
+
+                <h3 class="sectionTitle">When to download</h3>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label><input is="emby-checkbox" type="checkbox" id="EnableOnItemAdded" /><span>Download when new items are added</span></label>
+                    <div class="fieldDescription checkboxFieldDescription">Seasons and episodes trigger a single download for their series.</div>
+                </div>
+                <div class="checkboxContainer">
+                    <label><input is="emby-checkbox" type="checkbox" id="EnableMovies" /><span>Movies</span></label>
+                </div>
+                <div class="checkboxContainer">
+                    <label><input is="emby-checkbox" type="checkbox" id="EnableSeries" /><span>TV series</span></label>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="number" id="ProcessDelayMinutes" min="0" max="120" label="Delay after item is added (minutes):" />
+                    <div class="fieldDescription">Gives Emby time to fetch metadata (trailer links) before downloading.</div>
+                </div>
+
+                <h3 class="sectionTitle">Trailer sources</h3>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="TmdbApiKey" label="TMDB API key (optional):" />
+                    <div class="fieldDescription">Adds extra trailer links in several languages from themoviedb.org, so a region-blocked video can be swapped for another. Free at themoviedb.org/settings/api.</div>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="PreferredLanguage" label="Preferred trailer language (2-letter code):" />
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label><input is="emby-checkbox" type="checkbox" id="EnableSearchFallback" /><span>Search YouTube if every known link fails</span></label>
+                    <div class="fieldDescription checkboxFieldDescription">Searches "&lt;title&gt; &lt;year&gt; official trailer" and takes the first result under 10 minutes with "trailer" or "teaser" in its title.</div>
+                </div>
+
+                <h3 class="sectionTitle">Download</h3>
+                <div class="selectContainer">
+                    <select is="emby-select" id="MaxResolution" label="Maximum resolution:">
+                        <option value="480">480p</option>
+                        <option value="720">720p</option>
+                        <option value="1080">1080p</option>
+                        <option value="1440">1440p</option>
+                        <option value="2160">2160p (4K)</option>
+                    </select>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="ProxyUrl" label="Proxy (optional):" />
+                    <div class="fieldDescription">Gets around region blocks, e.g. <code>socks5://user:pass@host:1080</code> or <code>http://host:8080</code>.</div>
+                </div>
+                <div class="selectContainer">
+                    <select is="emby-select" id="ProxyMode" label="Use proxy:">
+                        <option value="Fallback">Only when a direct download fails</option>
+                        <option value="Always">Always</option>
+                    </select>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="CookiesFile" label="Cookies file (optional):" />
+                    <div class="fieldDescription">Path on the server to a Netscape-format cookies.txt exported from a browser logged in to YouTube. Helps with "Sign in to confirm you're not a bot" and age-restricted trailers.</div>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="number" id="MaxAttempts" min="0" max="100" label="Give up on an item after this many failed attempts (0 = never):" />
+                </div>
+
+                <h3 class="sectionTitle">Advanced</h3>
+                <div class="selectContainer">
+                    <select is="emby-select" id="YtDlpChannel" label="yt-dlp update channel:">
+                        <option value="nightly">Nightly (recommended - fixes YouTube changes fastest)</option>
+                        <option value="stable">Stable</option>
+                    </select>
+                </div>
+                <div class="checkboxContainer checkboxContainer-withDescription">
+                    <label><input is="emby-checkbox" type="checkbox" id="ManageDeno" /><span>Install Deno for yt-dlp</span></label>
+                    <div class="fieldDescription checkboxFieldDescription">yt-dlp needs a JavaScript runtime for full YouTube support.</div>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="YtDlpPathOverride" label="yt-dlp path (leave blank to let the plugin manage it):" />
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="FfmpegPathOverride" label="ffmpeg path (leave blank to use Emby's):" />
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="ExtraYtDlpArgs" label="Extra yt-dlp arguments:" />
+                </div>
+
+                <div>
+                    <button is="emby-button" type="submit" class="raised button-submit block"><span>Save</span></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
