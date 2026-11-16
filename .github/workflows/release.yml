@@ -1,0 +1,61 @@
+name: Release plugin
+
+# Push a version tag to publish a release, e.g.:
+#   git tag v3.1.0 && git push origin v3.1.0
+# Tags with a suffix (v3.1.0-beta.1) are published as pre-releases.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write   # needed to create the release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Work out version from tag
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if ! [[ "$TAG" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-.+)?$ ]]; then
+            echo "::error::Tag '$TAG' must look like v1.2.3 or v1.2.3-beta.1"
+            exit 1
+          fi
+          # Full version (may include -beta) for display; numeric part for the assembly,
+          # which is what Emby shows as the plugin version.
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          echo "numeric=${BASH_REMATCH[1]}.${BASH_REMATCH[2]}.${BASH_REMATCH[3]}" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$([[ -n "${BASH_REMATCH[4]}" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - name: Build
+        run: >
+          dotnet build Emby.TrailerDownloader -c Release
+          -p:Version=${{ steps.version.outputs.version }}
+          -p:AssemblyVersion=${{ steps.version.outputs.numeric }}.0
+          -p:FileVersion=${{ steps.version.outputs.numeric }}.0
+
+      - name: Prepare release files
+        run: |
+          mkdir release
+          cp Emby.TrailerDownloader/bin/Release/netstandard2.0/Emby.TrailerDownloader.dll release/
+          cd release && sha256sum Emby.TrailerDownloader.dll > Emby.TrailerDownloader.dll.sha256
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          FLAGS=""
+          if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then FLAGS="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" \
+            release/Emby.TrailerDownloader.dll \
+            release/Emby.TrailerDownloader.dll.sha256 \
+            --title "Trailer Downloader $GITHUB_REF_NAME" \
+            --generate-notes \
+            $FLAGS
