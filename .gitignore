@@ -1,41 +1,21 @@
-lib-cov
-*.seed
-*.log
-*.csv
-*.dat
-*.out
-*.pid
-*.gz
-*.swp
+# .NET build output
+bin/
+obj/
+artifacts/
+*.user
+*.suo
+.vs/
 
-pids
-logs
-results
-tmp
+# Legacy Node version
+node_modules/
+dist/
+.progress-estimator/
 
-# Build
-public/css/main.css
-
-# Coverage reports
-coverage
-
-# API keys and secrets
+# Secrets
 .env
 
-# Dependency directory
-node_modules
-bower_components
-dist
-
-# Editors
-.idea
+# Editors / OS
+.idea/
 *.iml
-
-# OS metadata
 .DS_Store
 Thumbs.db
-
-# Ignore built ts files
-dist/**/*
-
-.progress-estimator/

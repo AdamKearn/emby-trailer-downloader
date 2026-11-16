@@ -1,64 +1,104 @@
-# Emby Trailer Downloader
-Download trailers locally to your media-server instead of streaming from youtube.
+# Emby Trailer Downloader (plugin)
+
+An Emby Server plugin that downloads trailers for your movies and TV shows and saves them locally next to the media, so they play without streaming from YouTube.
+
+> v3 replaces the old Node.js script. Everything now runs inside Emby: no cron job, `.env` file, Node or manual yt-dlp install.
+
+## How it works
+
+- **New items:** when a movie or series is added to the library, it is queued for a trailer. When a **season or episode** is added, its **series** is queued instead. Duplicates are merged and series that already have a trailer are skipped, so a show only gets one trailer however many episodes arrive.
+- **Waits for metadata:** the plugin waits a couple of minutes, re-checking up to three times, so Emby can fetch the item's trailer links first.
+- **Where trailers go:**
+  - `Movie (2024)/trailers/Movie (2024) - Trailer.mp4`
+  - `Show/trailers/Show (2020) - Trailer.mp4`
+  - If several movies share one folder, it uses `<movie file>-trailer.mp4` next to the movie instead.
+
+  Emby picks them up as local trailers automatically. The plugin refreshes the item so this happens straight away.
+- **Getting round blocked videos:** the plugin tries every source in this order until one works:
+  1. The trailer links Emby already has for the item.
+  2. Extra trailers and teasers from TMDB, in your preferred language, English and the original language. Needs an optional TMDB API key.
+  3. A YouTube search for `<title> <year> official trailer`. It only accepts results under 10 minutes with "trailer" or "teaser" in the title.
+
+  Each link is tried directly first, then through your proxy if you have set one.
+- **Retries:** an item that still fails is retried later, waiting longer each time (6h, 12h, 24h … up to 7 days). It is given up on after a set number of attempts (default 10).
+- **Self-managed tools:** the plugin downloads [yt-dlp](https://github.com/yt-dlp/yt-dlp) (nightly by default) and [Deno](https://deno.com) into its own data folder and updates them daily. Deno is the JavaScript runtime yt-dlp now needs for YouTube. The plugin uses Emby's bundled ffmpeg to merge the best video and audio streams.
+
+## Re-downloading a single trailer
+
+Use the **"..." menu → Refresh metadata** on any movie or TV show:
+
+| What you pick in the refresh dialog | What happens |
+| --- | --- |
+| **Search for missing metadata** (no trailer yet) | Downloads the trailer about 20 seconds later. Skips the retry wait and the give-up limit. |
+| **Replace all metadata** ticked | Downloads the trailer again and replaces the one the plugin saved before. Trailers you added yourself (other file names) are left alone. |
+
+Emby has no way for plugins to add their own "..." menu entries, so the plugin hooks into the existing Refresh metadata option instead. Library scans and other automatic refreshes don't trigger this.
+
+## Scheduled tasks
+
+These appear under **Dashboard → Scheduled Tasks → Trailer Downloader**:
+
+| Task | Default | Purpose |
+| --- | --- | --- |
+| Download missing trailers | Daily, 03:00 | Fills in trailers for your existing library and anything that was missed. **Run it once by hand after installing.** |
+| Retry all failed trailers now | Manual | Clears the retry history and tries every missing trailer again. Use it after adding a proxy or cookies. |
+| Update yt-dlp | Daily, 02:00 | Keeps yt-dlp and Deno up to date. |
 
 ## Installation
-First you need to download the repo and create an `.env` file to store the API key and URL to your Emby server.
+
+1. Build the plugin, or download `Emby.TrailerDownloader.dll` from the GitHub Actions artifacts:
+   ```
+   dotnet build Emby.TrailerDownloader -c Release
+   ```
+   The output is `Emby.TrailerDownloader/bin/Release/netstandard2.0/Emby.TrailerDownloader.dll`.
+2. Copy the DLL into Emby's `plugins` folder:
+   - Linux: `/var/lib/emby/plugins/`
+   - Docker: `/config/plugins/`
+   - Windows: `%AppData%\Emby-Server\programdata\plugins\`
+3. Restart Emby.
+4. Open **Dashboard → Plugins → Trailer Downloader** to configure it.
+5. Run **Download missing trailers** once.
+
+Requires **Emby Server 4.9+**.
+
+## Settings
+
+| Setting | Notes |
+| --- | --- |
+| Download when new items are added | The automatic trigger. Turn it off to rely only on the scheduled task. |
+| Movies / TV series | Which kinds of item get trailers. |
+| Delay after item is added | Default 2 minutes. |
+| TMDB API key | Optional, but recommended: it gives more alternative links when a video is region-blocked. Get a free key at <https://www.themoviedb.org/settings/api>. A v3 key or a v4 read token both work. |
+| Preferred trailer language | 2-letter code, e.g. `en`. |
+| Search YouTube if every known link fails | On by default. |
+| Maximum resolution | Default 1080p. |
+| Proxy | e.g. `socks5://user:pass@host:1080`. Use it with **Only when a direct download fails** (default) or **Always**. |
+| Cookies file | Netscape-format `cookies.txt` exported from a browser signed in to YouTube. Fixes "Sign in to confirm you're not a bot" and age-restricted trailers. |
+| yt-dlp / ffmpeg path | Overrides for platforms with no prebuilt yt-dlp (e.g. FreeBSD/TrueNAS CORE), or if you want your own builds. |
+| Extra yt-dlp arguments | Added to every yt-dlp call. |
+
+## Troubleshooting
+
+- **Logs:** look in the Emby server log for lines from `TrailerDownloader`.
+- **Region-blocked trailers:** add a TMDB key (more alternative trailers) and a proxy in an unblocked country.
+- **"Sign in to confirm you're not a bot":** add a cookies file. A proxy that isn't a datacenter IP also helps.
+- **Failure history:** stored in `plugins/configurations/TrailerDownloader/failures.json`. Delete it, or run **Retry all failed trailers now**, to start over.
+
+## Development
 
 ```
-git clone https://github.com/AdamKearn/emby-trailer-downloader.git
-cd emby-trailer-downloader
-
-sudo nano .env
+dotnet build Emby.TrailerDownloader -c Release
 ```
 
-Within the `.env` file it should look something like this.
+The project targets `netstandard2.0` and builds against the `MediaBrowser.Server.Core` NuGet package. The code is organised like this:
 
-```env
-API_KEY_EMBY=XXXXXXXXXXXXXXXXX
-EMBY_HOSTNAME=http://server:8096
-PROXY_STRING=socks5://<username>:<password>@<location.server.com>:1080
-COOKIES_FILE=/path/to/cookies.txt
-```
-
-## Dependencies
-You will need to install the latest version of YT-DLP to allow the videos to download in the background.
-You can use this website to get the install commands for your package manager.
-
-https://github.com/yt-dlp/yt-dlp/wiki/Installation
-
-If you are using linux I recommend using the APT option listed further down the page.
-
-You will also needs to make sure you have NodeJS/NPM installed as well as Yarn.
-I am currently using `NodeJS v18.16.0`, `NPM v9.6.6` and `Yarn v1.22.22`
-
-```
-npm install --global yarn
-```
-
-## Compiling
-Now you have all the dependencies installed you should now be able to install the modules and create a build using the below commands.
-After building you can now use the start command to run the script.  If you need to make modifications you can use `yarn run dev` for doing quick tests.
-
-```
-yarn install
-yarn run build
-
-yarn run start
-```
-
-This should now start to download all your trailers locally into a sub-folder within each movie/tv show.
-Please note all movies will need to be within a folder and not on their own. e.g. `Movie Name (2025)\Moive.mp4`
-
-## Automating Downloading.
-Once you are happy how everything is running you can now setup a cronjob to run the script automatically.
-
-The following cronjob will be run every day at 5am and downloads the latest version of yt-dlp from the [nightly build branch](https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest).
-
-You may need to modify the `update-and-start` script within `package.json` to use the correct architecture of your host.
-
-Make sure to change the path listed below to the correct location where you have downloaded the repo.
-```
-crontab -e
-
-0 5 * * * yarn --cwd /path/to/emby-trailer-downloader/ update-and-start
-```
+| File | Role |
+| --- | --- |
+| `TrailerEntryPoint.cs` | Hooks into `ILibraryManager.ItemAdded` and runs the delayed queue. |
+| `TrailerRefreshProvider.cs` | Queues a download (or forced re-download) when a user runs Refresh metadata. |
+| `Services/TrailerService.cs` | Picks the item to process, detects existing trailers, chooses download URLs, runs yt-dlp and moves the file into place. |
+| `Services/ToolManager.cs` | Installs and updates yt-dlp and Deno. |
+| `Services/TmdbClient.cs` | Optional TMDB lookups. |
+| `Services/FailureStore.cs` | Retry and backoff history. |
+| `ScheduledTasks/` | The three scheduled tasks. |
+| `Configuration/` | Plugin settings and the dashboard page. |
