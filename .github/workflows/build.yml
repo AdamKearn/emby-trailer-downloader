@@ -2,6 +2,7 @@ name: Build plugin
 
 on:
   push:
+    branches: ['**']   # tags are handled by release.yml
   pull_request:
 
 jobs:

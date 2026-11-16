@@ -46,11 +46,8 @@ These appear under **Dashboard → Scheduled Tasks → Trailer Downloader**:
 
 ## Installation
 
-1. Build the plugin, or download `Emby.TrailerDownloader.dll` from the GitHub Actions artifacts:
-   ```
-   dotnet build Emby.TrailerDownloader -c Release
-   ```
-   The output is `Emby.TrailerDownloader/bin/Release/netstandard2.0/Emby.TrailerDownloader.dll`.
+1. Download `Emby.TrailerDownloader.dll` from the latest [release](https://github.com/AdamKearn/emby-trailer-downloader/releases/latest).
+   Or build it yourself with `dotnet build Emby.TrailerDownloader -c Release`. The output is `Emby.TrailerDownloader/bin/Release/netstandard2.0/Emby.TrailerDownloader.dll`.
 2. Copy the DLL into Emby's `plugins` folder:
    - Linux: `/var/lib/emby/plugins/`
    - Docker: `/config/plugins/`
@@ -89,6 +86,24 @@ Requires **Emby Server 4.9+**.
 ```
 dotnet build Emby.TrailerDownloader -c Release
 ```
+
+Every push and pull request is built by GitHub Actions, and the DLL is uploaded as a build artifact.
+
+### Publishing a release
+
+Push a version tag:
+
+```
+git tag v3.1.0
+git push origin v3.1.0
+```
+
+The **Release plugin** workflow then:
+- builds the DLL with that version number, which is the version Emby shows;
+- creates a GitHub Release with auto-generated notes;
+- attaches `Emby.TrailerDownloader.dll` and a `.sha256` checksum.
+
+Tags with a suffix, such as `v3.1.0-beta.1`, are published as pre-releases.
 
 The project targets `netstandard2.0` and builds against the `MediaBrowser.Server.Core` NuGet package. The code is organised like this:
 
