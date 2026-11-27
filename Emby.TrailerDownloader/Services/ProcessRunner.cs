@@ -17,6 +17,15 @@ namespace Emby.TrailerDownloader.Services
 
     public static class ProcessRunner
     {
+        /// <summary>
+        /// The library search path Emby was started with. Emby's Linux packages / Docker images launch the
+        /// server with LD_LIBRARY_PATH pointing at Emby's own bundled libraries (e.g. /app/emby/lib). Child
+        /// processes inherit it, which makes unrelated programs such as yt-dlp load Emby's copies of
+        /// libssl/libz/etc. and crash (exit code 139 / SIGSEGV), so it is removed for every tool we start.
+        /// Only Emby's own ffmpeg needs it, and gets it back through a wrapper script (see ToolManager).
+        /// </summary>
+        public static readonly string InheritedLibraryPath = Environment.GetEnvironmentVariable("LD_LIBRARY_PATH");
+
         public static async Task<ProcessResult> RunAsync(
             string fileName,
             IEnumerable<string> args,
@@ -34,6 +43,8 @@ namespace Emby.TrailerDownloader.Services
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8
             };
+
+            psi.Environment.Remove("LD_LIBRARY_PATH");
 
             var stdout = new StringBuilder();
             var stderr = new StringBuilder();

@@ -13,7 +13,7 @@ An Emby Server plugin that downloads trailers for your movies and TV shows and s
   - `Show/trailers/Show (2020) - Trailer.mp4`
   - If several movies share one folder, it uses `<movie file>-trailer.mp4` next to the movie instead.
 
-  Emby picks them up as local trailers automatically. The plugin refreshes the item so this happens straight away.
+  After saving, the plugin asks Emby to register the trailer straight away. Only that movie or show is refreshed: no metadata or images are re-downloaded, and other libraries aren't touched.
 - **Getting round blocked videos:** the plugin tries every source in this order until one works:
   1. The trailer links Emby already has for the item.
   2. Extra trailers and teasers from TMDB, in your preferred language, English and the original language. Needs an optional TMDB API key.
@@ -77,6 +77,10 @@ Requires **Emby Server 4.9+**.
 ## Troubleshooting
 
 - **Logs:** look in the Emby server log for lines from `TrailerDownloader`.
+- **Docker / Unraid (fixed in v3.0.1):** v3.0.0 failed in Emby's Docker images with "Access denied" / "Permission denied" on `yt-dlp.new`, or yt-dlp "exited with code 139". To fix it:
+  1. Install v3.0.1 or later.
+  2. Clear the **yt-dlp path** setting if you set it as a workaround.
+  3. Run **Retry all failed trailers now**.
 - **Region-blocked trailers:** add a TMDB key (more alternative trailers) and a proxy in an unblocked country.
 - **"Sign in to confirm you're not a bot":** add a cookies file. A proxy that isn't a datacenter IP also helps.
 - **Failure history:** stored in `plugins/configurations/TrailerDownloader/failures.json`. Delete it, or run **Retry all failed trailers now**, to start over.

@@ -69,17 +69,26 @@ namespace Emby.TrailerDownloader.Services
             Directory.CreateDirectory(dataDir);
             _tempRoot = Path.Combine(dataDir, "temp");
 
-            string ffmpeg = null;
-            try
+            // Looked up on every use, not once here: this runs during server start-up, before Emby has
+            // necessarily finished detecting its ffmpeg.
+            string Lookup(Func<string> getter)
             {
-                ffmpeg = ffmpegManager?.FfmpegConfiguration?.EncoderPath;
-            }
-            catch (Exception ex)
-            {
-                _logger.ErrorException("Could not determine Emby's ffmpeg path", ex);
+                try
+                {
+                    return getter();
+                }
+                catch (Exception ex)
+                {
+                    _logger.Debug("Could not read Emby's ffmpeg configuration: {0}", ex.Message);
+                    return null;
+                }
             }
 
-            Tools = new ToolManager(_logger, dataDir, ffmpeg);
+            Tools = new ToolManager(
+                _logger,
+                dataDir,
+                () => Lookup(() => ffmpegManager?.FfmpegConfiguration?.EncoderPath),
+                () => Lookup(() => ffmpegManager?.FfmpegConfiguration?.ProbePath));
             Failures = new FailureStore(json, _logger, dataDir);
             _tmdb = new TmdbClient(json, _logger);
         }
@@ -452,53 +461,85 @@ namespace Emby.TrailerDownloader.Services
             var target = targetBase + Path.GetExtension(downloadedFile);
             Directory.CreateDirectory(targetDir);
 
-            // Replace a trailer this plugin saved earlier (possibly with a different extension).
-            // Trailers with other names (e.g. added by hand) are left alone.
-            foreach (var old in Directory.EnumerateFiles(targetDir, Path.GetFileName(targetBase) + ".*").Where(IsVideoFile).ToList())
+            // Copy under a non-video name first, then rename within the same folder (atomic), so Emby never sees
+            // a half-written video. Deliberately NOT using ILibraryMonitor.ReportFileSystemChangeBeginning/Complete:
+            // that locks the path for ~45s and Emby's scanner skips locked paths, so the rescan below would miss it.
+            var partial = target + ".partial";
+            try
             {
-                File.Delete(old);
-            }
+                File.Copy(downloadedFile, partial, true);
 
-            File.Move(downloadedFile, target);
+                // Replace a trailer this plugin saved earlier (possibly with a different extension).
+                // Trailers with other names (e.g. added by hand) are left alone.
+                foreach (var old in Directory.EnumerateFiles(targetDir, Path.GetFileName(targetBase) + ".*").Where(IsVideoFile).ToList())
+                {
+                    File.Delete(old);
+                }
+
+                File.Move(partial, target);
+            }
+            finally
+            {
+                if (File.Exists(partial)) File.Delete(partial);
+            }
 
             _logger.Info("Saved trailer for {0} to {1}", Describe(item), target);
             Failures.Clear(item.InternalId);
 
-            await RescanItemAsync(item, targetDir, cancellationToken).ConfigureAwait(false);
+            await RegisterTrailerAsync(item, cancellationToken).ConfigureAwait(false);
             return TrailerOutcome.Downloaded;
         }
 
         /// <summary>
-        /// Rescans just this movie/series so Emby registers the new trailer straight away - no library scan.
+        /// Gets Emby to register the new local trailer without a full library scan.
+        ///
+        /// How Emby finds local trailers (from Emby 4.10's BaseItem.ValidateChildrenInternal): the *parent* folder
+        /// re-reads its children, which attaches newly found extras to the existing movie/series
+        /// (ResolvedExtras), and the movie/series is then refreshed, which registers them. Tested on Emby 4.10
+        /// (linuxserver Docker image), only one way does both from a plugin:
+        ///  - refreshing the movie/series itself (any mode, recursive or not): never finds the new file;
+        ///  - parent ValidateChildren / QueueRefresh non-recursive, or RefreshFullItem: no effect;
+        ///  - QueueRefresh of the parent with Recursive = true and IsAutomated = false - exactly what the
+        ///    POST /Items/{id}/Refresh endpoint queues: registers the trailer within ~1 second.
+        /// RefreshPaths limits the metadata refresh to this item (MetadataRefreshOptions.RefreshItem filters the
+        /// parent's children by it); ValidationOnly means no metadata/image downloads. For a movie the parent is its
+        /// own folder. For a series it's the library root, so Emby re-lists that library's folders (directory
+        /// listings only) but still refreshes only this series.
+        ///
+        /// The refresh can't re-trigger a download: TrailerRefreshProvider only acts on ReplaceAllMetadata or on
+        /// items with no trailer on disk.
         /// </summary>
-        private async Task RescanItemAsync(BaseItem item, string trailerDir, CancellationToken cancellationToken)
+        private async Task RegisterTrailerAsync(BaseItem item, CancellationToken cancellationToken)
         {
-            var itemFolder = GetItemFolder(item);
-            var options = new MetadataRefreshOptions(_fileSystem)
-            {
-                // Re-read these folders from disk instead of Emby's cached directory listing,
-                // otherwise the refresh may not notice the file we just wrote.
-                RefreshPaths = new[] { itemFolder, trailerDir }.Distinct(StringComparer.OrdinalIgnoreCase).ToArray(),
-                // Default = keep existing metadata/images, only fill gaps and pick up file changes (incl. extras).
-                MetadataRefreshMode = MetadataRefreshMode.Default,
-                ImageRefreshMode = MetadataRefreshMode.Default,
-                ReplaceAllMetadata = false,
-                ReplaceAllImages = false,
-                Recursive = false,
-                ForceSave = true,
-                // Marks this refresh as ours so TrailerRefreshProvider doesn't treat it as a user request.
-                IsAutomated = true
-            };
-
             try
             {
-                if (item is Series)
+                var parent = item.GetParent();
+                if (parent == null)
                 {
-                    // Series are folders: validate only the series folder itself (not seasons/episodes).
-                    await item.ValidateChildren(new Progress<double>(), cancellationToken, options, false).ConfigureAwait(false);
+                    _logger.Info("Trailer for {0} will appear after the next library scan", Describe(item));
+                    return;
                 }
 
-                await item.RefreshMetadata(options, cancellationToken).ConfigureAwait(false);
+                var options = new MetadataRefreshOptions(_fileSystem)
+                {
+                    MetadataRefreshMode = MetadataRefreshMode.ValidationOnly,
+                    ImageRefreshMode = MetadataRefreshMode.ValidationOnly,
+                    ReplaceAllMetadata = false,
+                    ReplaceAllImages = false,
+                    // Only refresh this movie/series - Emby's own way of scoping a folder refresh
+                    // (MetadataRefreshOptions.RefreshItem filters the parent's children by these paths).
+                    RefreshPaths = new[] { item.Path },
+                    Recursive = true,
+                    IsAutomated = false
+                };
+
+                // Identical to what POST /Items/{parentId}/Refresh queues (Recursive = true, IsAutomated = false),
+                // scoped by RefreshPaths so only this item's metadata is refreshed.
+                _providerManager.QueueRefresh(parent.InternalId, options, RefreshPriority.High);
+
+                _logger.Info("Asked Emby to register the trailer for {0} (scan of {1} [id {2}], refreshing this item only)",
+                    Describe(item), parent.Path ?? parent.Name, parent.InternalId);
+                await Task.CompletedTask.ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -506,26 +547,7 @@ namespace Emby.TrailerDownloader.Services
             }
             catch (Exception ex)
             {
-                _logger.ErrorException("Trailer saved, but rescanning {0} failed; it will be picked up by the next library scan", ex, Describe(item));
-                return;
-            }
-
-            var refreshed = GetItem(item.InternalId) ?? item;
-            if (refreshed.LocalTrailerCount > 0)
-            {
-                _logger.Info("Emby detected the trailer for {0}", Describe(item));
-                return;
-            }
-
-            // Fall back to Emby's refresh queue (still just this item) in case the direct refresh was skipped.
-            _logger.Warn("Trailer for {0} not detected after rescan; queueing another refresh of this item", Describe(item));
-            try
-            {
-                _providerManager.QueueRefresh(item.InternalId, options, RefreshPriority.High);
-            }
-            catch (Exception ex)
-            {
-                _logger.ErrorException("Queueing a refresh for {0} failed", ex, Describe(item));
+                _logger.ErrorException("Trailer for {0} saved, but asking Emby to register it failed; it will appear after the next library scan", ex, Describe(item));
             }
         }
 
@@ -559,7 +581,7 @@ namespace Emby.TrailerDownloader.Services
 
             var config = Plugin.Instance.Configuration;
             var height = config.MaxResolution > 0 ? config.MaxResolution : 1080;
-            var ffmpeg = Tools.FfmpegPath;
+            var ffmpeg = await Tools.GetFfmpegLocationForYtDlpAsync(cancellationToken).ConfigureAwait(false);
 
             var args = new List<string>
             {
@@ -581,6 +603,10 @@ namespace Emby.TrailerDownloader.Services
                 args.AddRange(new[]
                 {
                     "-f", $"bv*[height<={height}]+ba/b[height<={height}]/bv*+ba/b",
+                    // Highest resolution first; at equal resolution prefer H.264 video + AAC audio. YouTube's
+                    // default pick is often AV1 + Opus, which many TVs/streaming sticks can't play directly,
+                    // forcing Emby to transcode every time a trailer plays.
+                    "-S", "res,vcodec:h264,acodec:aac",
                     "--merge-output-format", "mp4",
                     "--ffmpeg-location", ffmpeg
                 });
@@ -641,7 +667,7 @@ namespace Emby.TrailerDownloader.Services
                 _logger.Warn("YouTube is asking this server to sign in. Setting a cookies file and/or a proxy in the plugin settings usually fixes this.");
             }
 
-            _logger.Debug("yt-dlp failed for {0}{1}: {2}", url, proxy != null ? " (via proxy)" : string.Empty, error);
+            _logger.Info("yt-dlp failed for {0}{1}: {2}", url, proxy != null ? " (via proxy)" : string.Empty, error);
             return new AttemptResult { Error = error };
         }
 
@@ -654,7 +680,7 @@ namespace Emby.TrailerDownloader.Services
 
             if (errorLine != null) return errorLine;
             if (result.ExitCode == 0 || result.ExitCode == 101) return "No matching trailer found";
-            return $"yt-dlp exited with code {result.ExitCode}";
+            return "yt-dlp " + ToolManager.DescribeExitCode(result.ExitCode);
         }
 
         private static void TryDeleteDirectory(string dir)
